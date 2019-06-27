@@ -31,6 +31,9 @@ func TestGeneration(t *testing.T) {
 		{"mov r13, qword [r14]", func(b *Builder) { b.EmitMovRegMem(R13, R14, 0) }, []byte{0x4d, 0x8b, 0x2e}},
 		{"mov r13, qword [r14 + 0x05]", func(b *Builder) { b.EmitMovRegMem(R13, R14, 0x05) }, []byte{0x4d, 0x8b, 0x6e, 0x05}},
 		{"mov r13, qword [r14 + 0x81]", func(b *Builder) { b.EmitMovRegMem(R13, R14, 0x81) }, []byte{0x4d, 0x8b, 0xae, 0x81, 0x00, 0x00, 0x00}},
+		{"mov r13, qword [rax]", func(b *Builder) { b.EmitMovRegMem(R13, RAX, 0x00) }, []byte{0x4c, 0x8b, 0x28}},
+		{"mov r13, qword [rbx]", func(b *Builder) { b.EmitMovRegMem(R13, RBX, 0x00) }, []byte{0x4c, 0x8b, 0x2b}},
+		{"mov r13, qword [rbx+0x81]", func(b *Builder) { b.EmitMovRegMem(R13, RBX, 0x81) }, []byte{0x4c, 0x8b, 0xab, 0x81, 0x00, 0x00, 0x00}},
 
 		/*
 			0:  48 ff c0                inc    rax
@@ -199,7 +202,7 @@ func TestJne(t *testing.T) {
 	offset := len(b.output)    // loop1:
 	b.EmitAddRegImm(RAX, 0x02) // add rax, 0x02
 	b.EmitCmpRegImm(RAX, 10)   // cmp rax, 0xa
-	b.EmitJne(offset)          // jne loop1
+	b.EmitJne(int32(offset))   // jne loop1
 
 	expectedOutput := []byte{
 		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00, // mov rax, 0x00
@@ -208,6 +211,73 @@ func TestJne(t *testing.T) {
 		0x48, 0x83, 0xf8, 0x0a, // cmp rax, 10
 		0x75, 0xf6, // jne loop1
 	}
+	if !bytes.Equal(b.output, expectedOutput) {
+		t.Errorf("unexpected generated output %s, expected %s", b.hex(), hexB(expectedOutput))
+	}
+}
+
+func TestJneLong(t *testing.T) {
+	/*
+		0:  48 c7 c0 01 00 00 00    mov    rax,0x1
+		7:  48 c7 c3 02 00 00 00    mov    rbx,0x2
+		000000000000000e <loop1>:
+		e:  48 c7 c0 81 00 00 00    mov    rax,0x81
+		15: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		1c: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		23: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		2a: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		31: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		38: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		3f: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		46: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		4d: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		54: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		5b: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		62: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		69: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		70: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		77: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		7e: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		85: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		8c: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		93: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		9a: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		a1: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		a8: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		af: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		b6: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		bd: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		c4: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		cb: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		d2: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		d9: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		e0: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		e7: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		ee: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		f5: 48 c7 c0 81 00 00 00    mov    rax,0x81
+		fc: 0f 85 0c ff ff ff       jne    e <loop1>
+	*/
+	b := &Builder{}
+	b.EmitMovRegImm(RAX, 0x01)
+	b.EmitMovRegImm(RBX, 0x02)
+	offset := b.CurrentOffset() // loop1:
+	for i := 0; i < 34; i++ {
+		b.EmitMovRegImm(RAX, 0x81)
+	}
+	b.EmitJne(offset) // jne loop1
+
+	expectedOutput := []byte{
+		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,
+		0x48, 0xc7, 0xc3, 0x02, 0x00, 0x00, 0x00,
+	}
+	// loop1:
+	for i := 0; i < 34; i++ {
+		expectedOutput = append(
+			expectedOutput, 0x48, 0xc7, 0xc0, 0x81, 0x00, 0x00, 0x00,
+		)
+	}
+	// jne loop1
+	expectedOutput = append(expectedOutput, 0x0f, 0x85, 0x0c, 0xff, 0xff, 0xff)
 	if !bytes.Equal(b.output, expectedOutput) {
 		t.Errorf("unexpected generated output %s, expected %s", b.hex(), hexB(expectedOutput))
 	}

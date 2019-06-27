@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"strings"
 
@@ -10,34 +11,52 @@ import (
 
 const testProgram3 = `++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.`
 
-const testProgram = `++>+++++[<+>-]++++++++[<++++++>-]<.`
+const testProgram2 = `++>+++++[<+>-]++++++++[<++++++>-]<.`
 
-const testProgram2 = `>++++[>++++++<-]>-[[<+++++>>+<-]>-]<<[<]>>>>--.<<<-.>>>-.<.<.>---.<<+++.>>>++.<<---.[>]<<.`
+const testProgram = `>++++[>++++++<-]>-[[<+++++>>+<-]>-]<<[<]>>>>--.<<<-.>>>-.<.<.>---.<<+++.>>>++.<<---.[>]<<.`
 
 type CompiledOutput struct {
 	bufASM strings.Builder
-	x64    x64e.Builder
+	x64    *x64e.Builder
 
 	nextLoopNumber     int
 	loopStack          []int
-	loopNumberToOffset map[int]int
+	loopNumberToOffset map[int]int32
 }
 
 func NewCompiledOutput() *CompiledOutput {
 	c := &CompiledOutput{
-		loopNumberToOffset: make(map[int]int),
+		loopNumberToOffset: make(map[int]int32),
+		x64:                x64e.NewBuilder(),
 	}
 
 	// Some initialisation.
 	// TODO: Move somewhere better
-	c.x64.EmitMovRegImm(x64e.RAX, 0xdead)
+	cells := c.x64.BssAdd(1024 * 64)
+	output := c.x64.BssAdd(1024)
+	c.x64.EmitMovRegImm(x64e.RAX, cells)
 	c.x64.EmitMovRegImm(x64e.R13, 0)
 	c.x64.EmitMovRegImm(x64e.R14, 0)
-	c.x64.EmitMovRegImm(x64e.R15, 0xbeef)
+	c.x64.EmitMovRegImm(x64e.R15, output)
+	c.x64.EmitMovRegImm(x64e.R12, output)
 	return c
 }
 
 func (c *CompiledOutput) Build() string {
+
+	// Add the write and exit after the generated code
+	// TODO: Move to somewhere better! This is a confusing
+	// place to put it I think.
+	c.x64.EmitMovRegImm(x64e.RAX, 4) // sys_write
+	c.x64.EmitMovRegImm(x64e.RBX, 1) // fd 1: stdout
+	c.x64.EmitMovRegReg(x64e.RCX, x64e.R12)
+	c.x64.EmitMovRegReg(x64e.RDX, x64e.R14)
+	c.x64.EmitInt(0x80)
+
+	c.x64.EmitMovRegImm(x64e.RAX, 1) // sys_exit
+	c.x64.EmitMovRegImm(x64e.RBX, 3) // return code // TODO: return 3 for testing.
+	c.x64.EmitInt(0x80)
+
 	return fmt.Sprintf(`section .bss
 
 buflen equ 1024
@@ -54,7 +73,6 @@ mov rax, cells	; current position in cells
 mov r13, 0		; temp reg for moving between cells and output
 mov r14, 0		; length of output
 mov r15, output
-
 %s
 
 write:
@@ -94,6 +112,8 @@ func (c *CompiledOutput) EmitLoop() {
 	c.bufASM.WriteString(loopLabel + "\n")
 	c.loopStack = append(c.loopStack, c.nextLoopNumber)
 	c.loopNumberToOffset[c.nextLoopNumber] = c.x64.CurrentOffset()
+	fmt.Printf("Loop Offsets: %v\n", c.loopNumberToOffset)
+	fmt.Println(c.x64.Hex())
 }
 func (c *CompiledOutput) EmitLoopJump() {
 	loopNumber := c.nextLoopNumber
@@ -160,6 +180,19 @@ func main() {
 		log.Fatal(err)
 	}
 	compiled := output.Build()
-	fmt.Println(compiled)
+	// fmt.Println(compiled)
 	fmt.Println(output.x64.Hex())
+
+	filename := "brainfunk.asm"
+	if err := ioutil.WriteFile(filename, []byte(compiled), 0755); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("wrote asm to %s\n", filename)
+
+	filename = "brainfunk"
+	data := output.x64.Build()
+	if err := ioutil.WriteFile(filename, data, 0755); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("wrote binary to %s\n", filename)
 }

@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+
+	"github.com/vishen/go-brainfunk/elf"
 )
 
 // NOTE: https://www.felixcloutier.com/x86/
@@ -43,11 +45,31 @@ const (
 )
 
 type Builder struct {
-	output []byte
+	output         []byte
+	currentBssSize uint32
+
+	elfB *elf.Builder
 }
 
-func (b *Builder) CurrentOffset() int {
-	return len(b.output)
+func NewBuilder() *Builder {
+	return &Builder{
+		elfB: elf.NewBuilder(),
+	}
+}
+
+func (b *Builder) Build() []byte {
+	return b.elfB.Build(b.output, b.currentBssSize)
+}
+
+func (b *Builder) CurrentOffset() int32 {
+	return int32(len(b.output))
+}
+
+func (b *Builder) BssAdd(size uint32) uint32 {
+	addr := b.currentBssSize + b.elfB.BssStartAddr()
+	b.currentBssSize += size
+	return addr
+
 }
 
 // TODO: Clean up
@@ -100,7 +122,7 @@ func (b *Builder) EmitInt(imm byte) {
 	b.output = append(b.output, 0xcd, imm)
 }
 
-func (b *Builder) EmitJne(offset int) {
+func (b *Builder) EmitJne(offset int32) {
 	/*
 		TODO: this will only work with jumps > -128 && jumps < 127. As shown
 		in by the below blog post, if the fump distance is not in-between:
@@ -122,10 +144,25 @@ func (b *Builder) EmitJne(offset int) {
 		}
 	*/
 
+	// TODO: This only handles backwards jumps, handle forward
+	// jumps if required!
+
 	// two's complement of the distance between the current
 	// instruction and the offset
-	negativeOffset := (0xff - 1) - (len(b.output) - offset)
-	b.output = append(b.output, 0x75, byte(negativeOffset))
+	jumpToOffset := int32(len(b.output)) - offset
+	if jumpToOffset >= -128 && jumpToOffset <= 127 {
+		jumpToOffset += 2 // Length of the jump instruction
+		b.output = append(b.output, 0x75, byte(0xff-(jumpToOffset-1)))
+	} else {
+		b.output = append(b.output, 0x0F, 0x10+0x75)
+		buf := make([]byte, 4)
+		// NOTE: This magic 6 is the length of this encoding. The
+		// jump offset needs to be AFTER the command has executed.
+		jumpToOffset += 6 // Length of the jump instruction.
+		x := uint32(0xffffffff) - uint32(jumpToOffset-1)
+		binary.LittleEndian.PutUint32(buf, x)
+		b.output = append(b.output, buf...)
+	}
 }
 
 func (b *Builder) EmitIncReg(src Register) {
@@ -175,7 +212,7 @@ func (b *Builder) EmitMovMemReg(src, dest Register, displacement uint32) {
 }
 
 func (b *Builder) EmitMovRegMem(src, dest Register, displacement uint32) {
-	b.emitREX(true, dest.IsExt(), false, src.IsExt())
+	b.emitREX(true, src.IsExt(), false, dest.IsExt())
 	b.output = append(b.output, 0x8b)
 	if displacement == 0 {
 		b.emitModRM(0x00, src.Reg(), dest.Reg())
