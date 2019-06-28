@@ -1,0 +1,9 @@
+- brainfuck program should be able to read character from stdin
+- brainfuck program should output single character to stdout
+	- currently it outputs to a buffer then writes to stdout at the end of the program
+- brainfuck program should allow comments
+- extend brainfuck program to allow `(.+<>)*[0-9]+)`, so instead of writing five `>>>>>` you can write `>*5`
+- output dwarf debug into?
+- fix the `file <executable>`: ./brainfuck: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, corrupted section header size 
+	- this is happening because I don't output any section headers, but maybe I can fix this somehow without having to add section headers?
+	- what is section header?
