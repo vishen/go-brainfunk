@@ -126,22 +126,23 @@ func (c *Compiler) ParseAndEmit() error {
 }
 
 var (
+	inputFilename    = flag.String("f", "", "path to bainfuck program to compile")
 	outputBinaryName = flag.String("o", "", "binary executable output name. Defaults to the passed in filename")
 )
 
 func usage() {
-	fmt.Printf("go-brainfunk /path/to/brainfuck-file -o <output-binary>\n")
+	fmt.Printf("usage: go-brainfunk -f /path/to/brainfuck-file -o <output-binary>\n")
 }
 
 func main() {
 	flag.Parse()
 
-	if len(flag.Args()) != 1 {
+	fileToCompile := *inputFilename
+	if fileToCompile == "" {
+		fmt.Printf("missing required flag -f <path/to/brainfuck program>\n")
 		usage()
 		return
 	}
-
-	fileToCompile := flag.Args()[0]
 	program, err := ioutil.ReadFile(fileToCompile)
 	if err != nil {
 		log.Fatalf("unable to open file %q: %v", fileToCompile, err)

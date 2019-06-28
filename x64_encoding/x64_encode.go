@@ -71,11 +71,6 @@ func (b *Builder) BssAdd(size uint32) uint32 {
 
 }
 
-// TODO: Clean up
-func (b *Builder) Hex() string {
-	return b.hex()
-}
-
 func (b *Builder) hex() string {
 	return hex.EncodeToString(b.output)
 }

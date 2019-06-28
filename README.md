@@ -12,9 +12,16 @@ Install the usual Go way `go get -u github.com/vishen/go-brainfunk`
 ## Running
 
 ```
+# Usage
+$ go-brainfunk
+missing required flag -f <path/to/brainfuck program>
+usage: go-brainfunk -f /path/to/brainfuck-file -o <output-binary>
+```
+
+```
 $ cat ./examples/hello_world.bf
 ++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.
-$ go-brainfunk ./examples/hello_world.bf
+$ go-brainfunk -f ./examples/hello_world.bf
 wrote executable to hello_world
 s ls -hal ./hello_world
 -rwxr-xr-x 1 vishen vishen 788 Jun 28 11:01 ./hello_world*
