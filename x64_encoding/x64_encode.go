@@ -3,7 +3,6 @@ package x64_encoding
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 
 	"github.com/vishen/go-brainfunk/elf"
 )
@@ -124,12 +123,6 @@ func (b *Builder) EmitInt(imm byte) {
 
 func (b *Builder) EmitJne(offset int32) {
 	/*
-		TODO: this will only work with jumps > -128 && jumps < 127. As shown
-		in by the below blog post, if the fump distance is not in-between:
-		-128 < jmp_distance< 127 then extra opcodes are required. However,
-		for the testing I did for basic brainfuck programs, the jump is rarely that
-		big.
-
 		// http://blog.jeff.over.bz/assembly/compilers/jit/2017/01/15/x86-assembler.html
 		uint8_t *jcc_mnemonic(int32_t bytes, uint8_t *buf) {
 			if (INT8_MIN <= bytes && bytes <= INT8_MAX) {
@@ -429,8 +422,4 @@ func (b *Builder) EmitCmpRegMem(src, dest Register, displacement uint32) {
 	} else {
 		b.emitModRMWithDisplacement(dest.Reg(), src.Reg(), displacement)
 	}
-}
-
-func x64EncodeTest() {
-	fmt.Println("x64 encoding test!")
 }

@@ -36,7 +36,9 @@ func (b *Builder) WriteValue(size int, value uint32) {
 
 func (o *Builder) Build(textSection []byte, bssSize uint32) []byte {
 	textSize := uint32(len(textSection))
-	// Size of ELF header + 2 * size program header?
+	// Size of ELF header + 2 * size program header. The size of
+	// the ELF header is always 0x40 bytes, and the size of each
+	// program header is always 0x38 bytes.
 	textOffset := uint32(0x40 + (2 * 0x38))
 
 	// Build ELF Header
