@@ -5,6 +5,29 @@ The x64 instructions are generated and encoded programatically and the raw bytes
 are used to output an elf executable. This is my first time generating x64 encodings
 and elf executables manually, so there is likely mistakes and better approaches.
 
+## Installing
+
+Install the usual Go way `go get -u github.com/vishen/go-brainfunk`
+
+## Running
+
+```
+$ cat ./examples/hello_world.bf
+++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.
+$ go-brainfunk ./examples/hello_world.bf
+wrote executable to hello_world
+s ls -hal ./hello_world
+-rwxr-xr-x 1 vishen vishen 788 Jun 28 11:01 ./hello_world*
+# Even though it says the section header size is corrupt, the binary
+# is still executable.
+$ file ./hello_world
+./hello_world: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, corrupted section header size
+$ ./hello_world
+Hello World!
+```
+
+## Notes
+
 Only a few x64 instructions were required for a brainfuck program:
 
 - mov
@@ -16,7 +39,7 @@ Only a few x64 instructions were required for a brainfuck program:
 - jne
 - int 0x80
 
-So I only included the x64 encodings for these instructions, and only
+so I only included the x64 encodings for these instructions, and only
 the 64-bit version of these instructions.
 
 The elf executable is also generated programatically and will ouput an elf 
@@ -37,7 +60,9 @@ always the case we can "hardcode" the uninitialised data addresses.
 
 ## x86-64 Instruction Encoding
 
-- REX (0-1 bytes) | Opcode (1-3 bytes) | MODR/M (0 -1 bytes) | SIB (0-1 bytes) | Displacement (0, 1, 2 or 4 bytes) | Immediate (0, 1, 2 or 4 bytes)
+```
+REX (0-1 bytes) | Opcode (1-3 bytes) | MODR/M (0 -1 bytes) | SIB (0-1 bytes) | Displacement (0, 1, 2 or 4 bytes) | Immediate (0, 1, 2 or 4 bytes)
+```
 
 ### REX
 
