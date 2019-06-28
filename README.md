@@ -5,6 +5,11 @@ The x64 instructions are generated and encoded programatically and the raw bytes
 are used to output an elf executable. This is my first time generating x64 encodings
 and elf executables manually, so there is likely mistakes and better approaches.
 
+The brainfuck compiler is currently unable to read from stdin, which is one of
+the expected commands, and it currently outputs to a buffer and then that buffer
+is written to stdout. Some brainfuck programs may not work at the moment, but I
+am looking at adding these features soon.
+
 ## Installing
 
 Install the usual Go way `go get -u github.com/vishen/go-brainfunk`
