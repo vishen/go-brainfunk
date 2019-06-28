@@ -54,8 +54,10 @@ A REX prefix must not be encoded when:
 
 #### REX Encoding
 
+```
 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
 | 0   1   0   0 | W | R | X | B |
+```
 
 - 0100 is a 4 bit fixed bit pattern.
 - W (1 bit): 1 when a 64-bit operand size is used. Otherwise, 0 will use the default 32-bit operand size.
@@ -70,8 +72,10 @@ direct register or effective memory address.
 
 #### MOD R/M Encoding
 
+```
 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
 |  mod  |    reg    |    rm     |
+```
 
 - MODRM.mod (2 bits):
 	- 00 -> [rax]
