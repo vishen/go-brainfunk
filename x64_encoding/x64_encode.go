@@ -116,7 +116,7 @@ func (b *Builder) EmitInt(imm byte) {
 	b.output = append(b.output, 0xcd, imm)
 }
 
-func (b *Builder) EmitJne(offset int32) {
+func (b *Builder) EmitJneBack(offset int32) {
 	/*
 		// http://blog.jeff.over.bz/assembly/compilers/jit/2017/01/15/x86-assembler.html
 		uint8_t *jcc_mnemonic(int32_t bytes, uint8_t *buf) {
@@ -132,12 +132,37 @@ func (b *Builder) EmitJne(offset int32) {
 		}
 	*/
 
-	// TODO: This only handles backwards jumps, handle forward
-	// jumps if required!
-
 	// two's complement of the distance between the current
 	// instruction and the offset
 	jumpToOffset := int32(len(b.output)) - offset
+	if jumpToOffset >= -128 && jumpToOffset <= 127 {
+		jumpToOffset += 2 // Length of the jump instruction
+		b.output = append(b.output, 0x75, byte(0xff-(jumpToOffset-1)))
+	} else {
+		b.output = append(b.output, 0x0F, 0x10+0x75)
+		buf := make([]byte, 4)
+		// NOTE: This magic 6 is the length of this encoding. The
+		// jump offset needs to be AFTER the command has executed.
+		jumpToOffset += 6 // Length of the jump instruction.
+		x := uint32(0xffffffff) - uint32(jumpToOffset-1)
+		binary.LittleEndian.PutUint32(buf, x)
+		b.output = append(b.output, buf...)
+	}
+}
+
+func (b *Builder) EmitJneForward(offset int32) {
+	/*
+		0:  48 c7 c0 04 00 00 00    mov    rax,0x4
+		7:  48 83 f8 03             cmp    rax,0x3
+		b:  75 1c                   jne    29 <j1>
+		d:  48 c7 c0 03 00 00 00    mov    rax,0x3
+		14: 48 c7 c0 02 00 00 00    mov    rax,0x2
+		1b: 48 c7 c0 01 00 00 00    mov    rax,0x1
+		22: 48 c7 c0 00 00 00 00    mov    rax,0x0
+		0000000000000029 <j1>:
+		29: 48 c7 c3 01 00 00 00    mov    rbx,0x1
+	*/
+	jumpToOffset := offset - int32(len(b.output))
 	if jumpToOffset >= -128 && jumpToOffset <= 127 {
 		jumpToOffset += 2 // Length of the jump instruction
 		b.output = append(b.output, 0x75, byte(0xff-(jumpToOffset-1)))

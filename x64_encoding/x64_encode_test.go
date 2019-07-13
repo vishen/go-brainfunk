@@ -198,11 +198,11 @@ func TestJne(t *testing.T) {
 		f:  75 f6                   jne    7 <loop1>
 	*/
 	b := &Builder{}
-	b.EmitMovRegImm(RAX, 0x01) // mov rax, 0x00
-	offset := len(b.output)    // loop1:
-	b.EmitAddRegImm(RAX, 0x02) // add rax, 0x02
-	b.EmitCmpRegImm(RAX, 10)   // cmp rax, 0xa
-	b.EmitJne(int32(offset))   // jne loop1
+	b.EmitMovRegImm(RAX, 0x01)   // mov rax, 0x00
+	offset := len(b.output)      // loop1:
+	b.EmitAddRegImm(RAX, 0x02)   // add rax, 0x02
+	b.EmitCmpRegImm(RAX, 10)     // cmp rax, 0xa
+	b.EmitJneBack(int32(offset)) // jne loop1
 
 	expectedOutput := []byte{
 		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00, // mov rax, 0x00
@@ -264,7 +264,7 @@ func TestJneLong(t *testing.T) {
 	for i := 0; i < 34; i++ {
 		b.EmitMovRegImm(RAX, 0x81)
 	}
-	b.EmitJne(offset) // jne loop1
+	b.EmitJneBack(offset) // jne loop1
 
 	expectedOutput := []byte{
 		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,

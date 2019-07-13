@@ -44,7 +44,6 @@ func NewCompiler(program []byte) *Compiler {
 }
 
 func (c *Compiler) Build() []byte {
-
 	// Add the write and exit after the generated code
 	c.x64.EmitMovRegImm(x64e.RAX, 4) // sys_write
 	c.x64.EmitMovRegImm(x64e.RBX, 1) // fd 1: stdout
@@ -53,7 +52,7 @@ func (c *Compiler) Build() []byte {
 	c.x64.EmitInt(0x80)
 
 	c.x64.EmitMovRegImm(x64e.RAX, 1) // sys_exit
-	c.x64.EmitMovRegImm(x64e.RBX, 3) // return code // TODO: return 3 for testing.
+	c.x64.EmitMovRegImm(x64e.RBX, 0) // return code
 	c.x64.EmitInt(0x80)
 	return c.x64.Build()
 }
@@ -87,7 +86,7 @@ func (c *Compiler) EmitLoopJump() {
 	}
 	offset := c.loopNumberToOffset[loopNumber]
 	c.x64.EmitCmpMemImm(x64e.RAX, 0)
-	c.x64.EmitJne(offset)
+	c.x64.EmitJneBack(offset)
 }
 func (c *Compiler) EmitOutputChar() {
 	c.x64.EmitMovRegMem(x64e.R13, x64e.RAX, 0)
