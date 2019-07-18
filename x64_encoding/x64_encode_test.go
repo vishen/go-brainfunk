@@ -283,6 +283,81 @@ func TestJneLong(t *testing.T) {
 	}
 }
 
+func TestJumpForward(t *testing.T) {
+	/*
+		0:  48 c7 c0 01 00 00 00    mov    rax,0x1
+		7:  48 c7 c0 01 00 00 00    mov    rax,0x1
+		e:  48 c7 c0 01 00 00 00    mov    rax,0x1
+		15: 74 23                   je     3a <loop1>
+		17: 48 c7 c0 01 00 00 00    mov    rax,0x1
+		1e: 48 c7 c0 01 00 00 00    mov    rax,0x1
+		25: 48 c7 c0 01 00 00 00    mov    rax,0x1
+		2c: 48 c7 c0 01 00 00 00    mov    rax,0x1
+		33: 48 c7 c0 01 00 00 00    mov    rax,0x1
+		000000000000003a <loop1>:
+		3a: 48 c7 c3 01 00 00 00    mov    rbx,0x
+	*/
+	b := &Builder{
+		addrIDToIndexInOutput: make(map[int]int),
+	}
+	b.EmitMovRegImm(RAX, 0x01)
+	b.EmitMovRegImm(RAX, 0x01)
+	b.EmitMovRegImm(RAX, 0x01)
+	addrID := b.EmitJeqNotYetDefined() // je loop1
+	b.EmitMovRegImm(RAX, 0x01)
+	b.EmitMovRegImm(RAX, 0x01)
+	b.EmitMovRegImm(RAX, 0x01)
+	b.EmitMovRegImm(RAX, 0x01)
+	b.CompleteJeq(addrID, b.CurrentOffset(), 2) // loop1:
+	b.EmitMovRegImm(RAX, 0x02)
+
+	expectedOutput := []byte{
+		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,
+		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,
+		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,
+		0x74, 0x22,
+		0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
+		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,
+		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,
+		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,
+		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,
+		0x48, 0xc7, 0xc0, 0x02, 0x00, 0x00, 0x00,
+	}
+	if !bytes.Equal(b.output, expectedOutput) {
+		t.Errorf("unexpected generated output %s, expected %s", b.hex(), hexB(expectedOutput))
+	}
+}
+
+func TestEmitCall(t *testing.T) {
+	/*
+		0:  48 c7 c0 01 00 00 00    mov    rax,0x1
+		7:  cd 80                   int    0x80
+		9:  90                      nop
+		a:  90                      nop
+		b:  e8 f0 ff ff ff          call   0 <_main>
+		10: 48 c7 c0 01 00 00 00    mov    rax,0x1
+	*/
+	b := &Builder{}
+	b.EmitMovRegImm(RAX, 0x01)
+	b.EmitInt(0x80)
+	b.EmitNop()
+	b.EmitNop()
+	b.EmitCall(0)
+	b.EmitMovRegImm(RAX, 0x01)
+
+	expectedOutput := []byte{
+		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,
+		0xcd, 0x80,
+		0x90,
+		0x90,
+		0xe8, 0xf0, 0xff, 0xff, 0xff,
+		0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00,
+	}
+	if !bytes.Equal(b.output, expectedOutput) {
+		t.Errorf("unexpected generated output %s, expected %s", b.hex(), hexB(expectedOutput))
+	}
+}
+
 func hexB(b []byte) string {
 	return hex.EncodeToString(b)
 }
