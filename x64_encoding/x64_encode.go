@@ -48,11 +48,15 @@ type Builder struct {
 	currentBssSize uint32
 
 	elfB *elf.Builder
+
+	addrID                int
+	addrIDToIndexInOutput map[int]int
 }
 
 func NewBuilder() *Builder {
 	return &Builder{
-		elfB: elf.NewBuilder(),
+		elfB:                  elf.NewBuilder(),
+		addrIDToIndexInOutput: make(map[int]int),
 	}
 }
 
@@ -116,7 +120,44 @@ func (b *Builder) EmitInt(imm byte) {
 	b.output = append(b.output, 0xcd, imm)
 }
 
-func (b *Builder) EmitJneBack(offset int32) {
+func (b *Builder) EmitJeqNotYetDefined() int {
+	b.addrID += 1
+	index := len(b.output)
+	b.addrIDToIndexInOutput[b.addrID] = index
+	// Fill the output with nop's and set these later.
+	// https://www.reddit.com/r/compsci/comments/ljbpq/how_does_a_onepass_assembler_handle_forward_jumps/
+	b.output = append(b.output, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90)
+	return b.addrID
+}
+
+func (b *Builder) EmitNop() {
+	b.output = append(b.output, 0x90)
+}
+
+func (b *Builder) CompleteJeq(addrID int, offset int32, length int) {
+	jeqOffset := b.addrIDToIndexInOutput[addrID]
+	jumpToOffset := (int(offset)) - (jeqOffset + length) // TODO: Offset This doesn't need to be int32...
+	var output []byte
+	if jumpToOffset >= -128 && jumpToOffset <= 127 {
+		// jumpToOffset += 2 // Length of the jump instruction
+		output = []byte{0x74, byte(jumpToOffset)}
+	} else {
+		output = []byte{0x0F, 0x10 + 0x74}
+		buf := make([]byte, 4)
+		// NOTE: This magic 6 is the length of this encoding. The
+		// jump offset needs to be AFTER the command has executed.
+		// jumpToOffset += 6 // Length of the jump instruction.
+		// x := uint32(0xffffffff) - uint32(jumpToOffset-1)
+		binary.LittleEndian.PutUint32(buf, uint32(jumpToOffset))
+		output = append(output, buf...)
+	}
+	// TODO: Fix offset being int32!
+	for i := 0; i < len(output); i++ {
+		b.output[jeqOffset+i] = output[i]
+	}
+}
+
+func (b *Builder) EmitJneBack(offset int32) int {
 	/*
 		// http://blog.jeff.over.bz/assembly/compilers/jit/2017/01/15/x86-assembler.html
 		uint8_t *jcc_mnemonic(int32_t bytes, uint8_t *buf) {
@@ -135,6 +176,7 @@ func (b *Builder) EmitJneBack(offset int32) {
 	// two's complement of the distance between the current
 	// instruction and the offset
 	jumpToOffset := int32(len(b.output)) - offset
+	outputBefore := len(b.output)
 	if jumpToOffset >= -128 && jumpToOffset <= 127 {
 		jumpToOffset += 2 // Length of the jump instruction
 		b.output = append(b.output, 0x75, byte(0xff-(jumpToOffset-1)))
@@ -148,34 +190,23 @@ func (b *Builder) EmitJneBack(offset int32) {
 		binary.LittleEndian.PutUint32(buf, x)
 		b.output = append(b.output, buf...)
 	}
+	return len(b.output) - outputBefore
 }
 
-func (b *Builder) EmitJneForward(offset int32) {
-	/*
-		0:  48 c7 c0 04 00 00 00    mov    rax,0x4
-		7:  48 83 f8 03             cmp    rax,0x3
-		b:  75 1c                   jne    29 <j1>
-		d:  48 c7 c0 03 00 00 00    mov    rax,0x3
-		14: 48 c7 c0 02 00 00 00    mov    rax,0x2
-		1b: 48 c7 c0 01 00 00 00    mov    rax,0x1
-		22: 48 c7 c0 00 00 00 00    mov    rax,0x0
-		0000000000000029 <j1>:
-		29: 48 c7 c3 01 00 00 00    mov    rbx,0x1
-	*/
-	jumpToOffset := offset - int32(len(b.output))
-	if jumpToOffset >= -128 && jumpToOffset <= 127 {
-		jumpToOffset += 2 // Length of the jump instruction
-		b.output = append(b.output, 0x75, byte(0xff-(jumpToOffset-1)))
-	} else {
-		b.output = append(b.output, 0x0F, 0x10+0x75)
-		buf := make([]byte, 4)
-		// NOTE: This magic 6 is the length of this encoding. The
-		// jump offset needs to be AFTER the command has executed.
-		jumpToOffset += 6 // Length of the jump instruction.
-		x := uint32(0xffffffff) - uint32(jumpToOffset-1)
-		binary.LittleEndian.PutUint32(buf, x)
-		b.output = append(b.output, buf...)
-	}
+func (b *Builder) EmitJmpForwardRelative(offset int32) {
+	b.output = append(b.output, 0xeb, byte(b.CurrentOffset()+offset))
+}
+
+func (b *Builder) EmitCall(offset int32) {
+	// two's complement of the distance between the current
+	// instruction and the offset
+	toOffset := int32(len(b.output)) - offset
+	toOffset += 5 // Length of the jump instruction
+	x := uint32(0xffffffff) - uint32(toOffset-1)
+	b.output = append(b.output, 0xE8)
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, x)
+	b.output = append(b.output, buf...)
 }
 
 func (b *Builder) EmitIncReg(src Register) {
@@ -442,4 +473,8 @@ func (b *Builder) EmitCmpRegMem(src, dest Register, displacement uint32) {
 	} else {
 		b.emitModRMWithDisplacement(dest.Reg(), src.Reg(), displacement)
 	}
+}
+
+func (b *Builder) EmitRet() {
+	b.output = append(b.output, 0xc3)
 }
